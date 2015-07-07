@@ -29,7 +29,7 @@
     <nav class="collapse navbar-collapse" role="navigation">
       <ul class="nav navbar-nav">
         <li>
-          <a href="http://www.slideshare.net/chg211/demo2-49881581">Slides</a>
+          <a href="http://www.slideshare.net/chg211/craigpredict-demo-slides-50100282">Slides</a>
         </li>
         <li>
         
@@ -59,7 +59,7 @@
       <div class="col-md-6">
    
         <div class="well well-lg"> 
-     <h2>How long until your car sells ?<br>
+     <h2>How long until your car sells in NYC ?<br>
 <br>How can you sell faster ?</h2>
           <div class="row">
             <div class="col-sm-12">
@@ -102,6 +102,7 @@
 <br>
 <strong><h4>Your car will sell within {{nr}} days with a probability of {{percent}} percent.</h4></strong>
    <br>
+ <strong><h4>Suggested changes to listing:</h4></strong>
     
 <br><strong>
         {% for message in messages %}
@@ -109,6 +110,16 @@
 
                     <br>
            {% endfor %} </strong>
+
+    <br>
+ <strong><h4>With the above changes, probabilities of sale within {{nr}} days for price reductions/increases:</h4></strong>
+   <br><strong>
+        {% for message in messages2 %}
+            {{message}} <br>
+
+                    <br>
+           {% endfor %} </strong>
+
    </div>           
 </div>
 
@@ -131,6 +142,8 @@
 				<td>{{odometer}}</td> <tr>
 				<td> Title:</td>
 				<td>{{title}}</td> <tr>
+                        <td>Location:</td>
+				<td>{{location}}</td> <tr>
 				<td> # Pictures:</td>
 				<td>{{nr_pics}}</td>
                   <tr>
@@ -140,8 +153,8 @@
 				<td> Phone:</td>
 				<td>{{phone}}</td>
                           <tr>
-				<td> Map:</td>
-				<td>{{map}}</td>
+				<td> Map of location:</td>
+				<td>{{geo}}</td>
                       <tr>
 				<td> Car Status:</td>
 				<td>{{car_status}}</td>

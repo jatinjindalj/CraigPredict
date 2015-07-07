@@ -3,7 +3,6 @@
 import numpy as np
 import pandas as pd
 import nltk as nltk
-import pymysql as mdb
 import sklearn
 import scipy as sci
 import nlp
@@ -16,27 +15,35 @@ def MakePrediction(nr,title,location, price,nr_pics,description,nr_links,contact
         learner = pickle.load( open( "RFLearnerHondaCivicNoText"+str(nr)+".p", "rb" ) )
         color_dict =  pickle.load( open("Color_HondaCivic_Dict.p","rb")  )
         cartype_dict =  pickle.load( open("CarType_HondaCivic_Dict.p","rb")  )
+        location_dict =  pickle.load( open("LocationDict_HondaCivic.p","rb")  )
         
-    elif "toyota camry" in car_model.lower() :
-        learner = pickle.load( open( "RFLearnerToyotaCamryNoText"+str(nr)+".p", "rb" ) )
+      elif "toyota camry" in car_model.lower() :
+        learner = pickle.load( open( "RFLearnerToyotaCamryNoTextNYC"+str(nr)+".p", "rb" ) )
         color_dict =  pickle.load( open("Color_ToyotaCamry_Dict.p","rb")  )
         cartype_dict =  pickle.load( open("CarType_ToyotaCamry_Dict.p","rb")  )
+        location_dict =  pickle.load( open("LocationDict_ToyotaCamry.p","rb")  )
     elif "nissan altima" in car_model.lower() :
-        learner = pickle.load( open( "RFLearnerNissanAltimaNoText"+str(nr)+".p", "rb" ) )
+        learner = pickle.load( open( "RFLearnerNissanAltimaNoTextNew"+str(nr)+".p", "rb" ) )
         color_dict =  pickle.load( open("Color_NissanAltima_Dict.p","rb")  )
         cartype_dict =  pickle.load( open("CarType_NissanAltima_Dict.p","rb")  )
+        location_dict =  pickle.load( open("LocationDict_NissanAltima.p","rb")  )
     
     len_title = len(title.split()) 
     len_description = len(description.split())
    
-    if color_dict[color]:
+    if color in color_dict.keys():
         color = color_dict[color] 
     else:
         color = -100
-    if cartype_dict[car_type]:
+    if car_type in cartype_dict.keys():
         car_type = cartype_dict[car_type] 
     else:
         car_type = -100
+
+    if location in location_dict.keys():
+        location = location_dict[location]
+    else:
+        location = -100
 
     car_status = 1 if car_status == 'clean' else 0
     cylinders = 0 if cylinders == "" else 1
@@ -46,13 +53,19 @@ def MakePrediction(nr,title,location, price,nr_pics,description,nr_links,contact
   
     year = car_model.split(" ")
     year = year[0]
+    if odometer < 1000 and year < 2015: 
+        odometer *= 1000
     if odometer == "":
         odometer = -10000
+    ratio_sentences_words = nlp.sentence_count(description.decode('utf-8'))/(len_description+1.)
+    ratio_sentences_words /= (len_description+1.)
+    lex_diversity = nlp.lexical_diversity(description.decode('utf-8'))
+    
     
     X1 = pd.Series([contact,nr_pics,price,len_title ,len_description, coord,
-                    cylinders,drive,fuel,odometer,color,car_status, transmission, year, car_type, nr_links] ,
+                    cylinders,drive,fuel,odometer,color,car_status, transmission, year, car_type, nr_links,ratio_sentences_words,lex_diversity, location] ,
                     index = ['Contact','NrPics','Price','LenTitle','LenDescription','COORD',
-                             'Cylinders','Drive','Fuel','Odometer','Color','CarStatus','Transmission','Year','CarType','NrLinks'])
+                             'Cylinders','Drive','Fuel','Odometer','Color','CarStatus','Transmission','Year','CarType','NrLinks','RatioSentencesWords','LexDiversity','LocationCats'])
    
     prob = learner.predict_proba(X1.values)
     prob = prob.ravel()
@@ -62,78 +75,107 @@ def MakePrediction(nr,title,location, price,nr_pics,description,nr_links,contact
     max_prob = prob
     best_pic = nr_pics
     best_title = len_title
-    best_desc = len_description    
+    best_desc = len_description 
+    best_ratio = ratio_sentences_words
+    best_lex = lex_diversity
     best_pic_index = 1
     best_title_index = 1
     best_desc_index = 1
+    best_ratio_index = 1
+    best_lex_ratio = 1
     no_odo = 0
     changes = [0,1,3]
     for ch_pic in changes: #50% less, 100% more
         X1S['NrPics'] = int((ch_pic*0.5  + 0.5) *nr_pics)
         for len_tit in changes:
-            X1S['LenTitle'] = nt((len_tit *0.5 +0.5) * len_title)
+            X1S['LenTitle'] = int((len_tit *0.5 +0.5) * len_title)
             for len_des in changes:
                 X1S['LenDescription'] = int((len_des *0.5 +0.5) * len_description)
-             
-                prob1 = learner.predict_proba(X1S.values)
-                prob1 = prob1.ravel()
-                prob1 = int(prob1[1] * 100)
-                prob2 = 0
-                if X1['Odometer'] != -10000:
-                    X1S['Odometer'] = -10000
-                    prob2 = learner.predict_proba(X1S.values)    
-                    prob2 = prob2.ravel()
-                    prob2 = int(prob2[1] * 100)
-                
-                if prob1 > max_prob:
-                    best_pic = X1S['NrPics']
-                    best_pic_index = ch_pic
-                    best_title = X1S['LenTitle']
-                    best_title_index = len_tit
-                    best_desc = X1S['LenDescription']
-                    best_desc_index = len_des
-                    max_prob = prob1
-                    no_odo = 0
-                    if prob2 > prob1:
-                        max_prob = prob2
-                        no_odo = 1
+                for rs in range(3):
+                    X1S['RatioSentencesWords'] = int(rs*0.5 + 0.5) * X1['RatioSentencesWords']
+                    for ld in range(3):
+                        X1S['LexDiversity'] = int(ld*0.5 + 0.5) * X1['LexDiversity']
+                        prob1 = learner.predict_proba(X1S.values)
+                        prob1 = prob1.ravel()
+                        prob1 = int(prob1[1] * 100)
+                        prob2 = 0
+                        if X1['Odometer'] != -10000:
+                            X1S['Odometer'] = -10000
+                            prob2 = learner.predict_proba(X1S.values)    
+                            prob2 = prob2.ravel()
+                            prob2 = int(prob2[1] * 100)
+                    
+                        if prob1 > max_prob:
+                            best_pic = X1S['NrPics']
+                            best_pic_index = ch_pic
+                            best_title = X1S['LenTitle']
+                            best_title_index = len_tit
+                            best_desc = X1S['LenDescription']
+                            best_desc_index = len_des
+                            best_ratio = X1S['RatioSentencesWords']
+                            best_ratio_index = rs
+                            best_lex = X1S['LexDiversity']
+                            best_lex_ratio = ld
+                            max_prob = prob1
+                            no_odo = 0
+                            if prob2 > prob1:
+                                max_prob = prob2
+                                no_odo = 1
                
     messages = []
    
     if best_pic_index == 0:
-        messages.append("Include half as many pictures. \n")
+        messages.append("- Include half as many pictures. \n")
     elif best_pic_index == 3:
-        messages.append("Include twice as many pictures. \n")
+        messages.append("- Include twice as many pictures. \n")
     if best_title_index == 0:
-        messages.append("Reduce the number of words in the title by 50 percent. \n")
+        messages.append("- Reduce the number of words in the title by 50 percent. \n")
     elif best_title_index ==3:
-        messages.append("Include twice as many words in the title. \n")
+        messages.append("- Include twice as many words in the title. \n")
     if best_desc_index == 0:
-        messages.append("Reduce the number of words in the description by  50 percent. \n")
+        messages.append("- Reduce the number of words in the description by  50 percent. \n")
     elif best_desc_index == 3:
-        messages.append("Include twice as many words in  the description. \n")
-       
+        messages.append("- Include twice as many words in  the description. \n")
+    if best_ratio == 0:
+        messages.append("- Use shorter sentences in the description. \n")
+    elif best_ratio == 2: 
+        messages.append("- Use longer sentences in the description. \n")
+    if best_lex == 0:
+        messages.append("- Formulate a more lexically diverse description.\n")
+    elif best_lex == 2: 
+        messages.append("- Formulate a less lexically diverse description. \n")
     if no_odo == 1:
-        messages.append( "Do not include odometer information in your listing. \n")
+        messages.append( "- Do not include odometer information in your listing. \n")
     if len(messages) > 0:
-        messages.insert(0,"If you make the following changes, your car will sell within {} days with a probability of {} percent: \n".format(nr, max_prob))
-   
-   
+        messages.insert(0,"Your car will sell within {} days with a probability of {} percent if you: \n".format(nr, max_prob))
+    messages2 = []
+ 
     X1S = X1.copy()
-    pr = 0.9  * price
+    X1S['NrPics']= best_pic
     X1S['LenTitle'] = best_title
-    X1S['LenDescription'] =  best_desc
+    X1S['LenDescription']= best_desc
+    X1S['LexDiversity'] = best_lex
+    X1S['RatioSentencesWords'] = best_ratio
     if no_odo == 1:
         X1S['Odometer'] = -10000
-    X1S['NrPics'] = best_pic
-    X1S['Price'] = pr                 
-    max_prob_price = learner.predict_proba(X1S.values)                 
-    max_prob_price=  max_prob_price.ravel()
-    max_prob_price = int( max_prob_price[1] * 100)        
-               
-    if max_prob_price > max_prob:
-        messages.append("If you additionally reduce the price by 10 percent to ${}, you will sell within {} days with a probability of {} percent.".format(pr, nr, max_prob_price))            
+    for i in range(10,40,10):
+        rat = (100 - i) *0.01 
+        pr = rat  * price
+        X1S['Price'] = pr                    
+        max_prob_price = learner.predict_proba(X1S.values)                 
+        max_prob_price=  max_prob_price.ravel()
+        max_prob_price = int( max_prob_price[1] * 100)        
+        messages2.append("Price reduction by {} percent to ${}:  {} percent.".format(i,pr,  max_prob_price))            
+    
+    for i in range(10,30,10):
+        rat = (100 + i) *0.01 
+        pr = rat  * price
+        X1S['Price'] = pr                    
+        max_prob_price = learner.predict_proba(X1S.values)                 
+        max_prob_price=  max_prob_price.ravel()
+        max_prob_price = int( max_prob_price[1] * 100)        
+        messages2.append("Price increase by {} percent to ${}:  {} percent.".format(i,pr,  max_prob_price))           
     
     
-    return (prob,  messages)
+    return (prob,  messages, messages2)
     
