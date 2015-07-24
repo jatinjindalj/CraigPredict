@@ -66,14 +66,15 @@ def cars_output():
             car_status = item_data[21]
             transmission = item_data[22]
             car_type = item_data[23]
-            if not "honda civic" in car_model.lower() and not "toyota camry" in car_model.lower() and not "nissan altima" in car_model.lower():
-                message += " Currently, only Honda Civic, Toyota Camry and Nissan Altima are supported."
-                err = True
+            if not "toyota camry" in car_model.lower() and not "nissan altima" in car_model.lower():#Honda Civic, #"honda civic" in car_model.lower() and
+                message += " Currently, only Toyota Camry and Nissan Altima are supported."
+                err = True 
             else:
-                (prob, messages, messages2) = MakePrediction(nr,title,location,price,nr_pics,description,nr_links,contact,note,coord,car_model, cylinders, drive, fuel, odometer, color, car_size, car_status, transmission, car_type)
+                
+                (prob, messages) = MakePrediction(nr,title,location,price,nr_pics,description,nr_links,contact,note,coord,car_model, cylinders, drive, fuel, odometer, color, car_size, car_status, transmission, car_type)
                 phone = "Yes" if contact == 1 else "No"
                 geo = "Yes" if coord == 1 else "No"
-                return render_template('output1.html', nr = nr, percent = prob, messages = messages, messages2 = messages2,car_model=car_model, price=price, odometer=odometer, title = title.rstrip("-"), location = location,
+                return render_template('output1.html', nr = nr, percent = prob, messages = messages,car_model=car_model, price=price, odometer=odometer, title = title.rstrip("-"), location = location,
             nr_pics = nr_pics, description=description,color = color, phone=phone, geo = geo, car_status = car_status, transmission=transmission,car_type = car_type )
             
       
